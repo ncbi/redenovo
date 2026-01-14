@@ -1,4 +1,4 @@
-# redenovo
+# ReDeNovo
 Hybrid detection of known and novel mutational signatures with ReDeNovo
 
 ## Installation
