@@ -73,7 +73,7 @@ redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --has-header
 | `-n`, `--numruns` | Number of runs to repeat the analysis | `10` |
 | `--thr1` | Minimum fraction of patients with exposure ≥ `thr1` required for a signature to be considered present | `0.1` |
 | `--thr2` | Minimum cosine similarity required to match a signature with a known COSMIC signature and include it in the inferred set | `0.70` |
-| `--thr3` | Minimum exposure weight required for a signature to contribute to the final exposure profile (keeps a signature if present in ≥7 runs out of 10 with `--thr3` = 0.70 and `--numruns` = 10) | `0.70` |
+| `--thr3` | Minimum exposure weight required for a signature to contribute to the final exposure profile (For example, a signature is accepted as inferred if it is present in ≥7 runs out of 10 when `--thr3` = 0.70 and `--numruns` = 10) | `0.70` |
 | `--thr4` | Minimum cosine similarity to consider a signature as known and exclude it from novel candidate detection | `0.80` |
 | `--thr5` | Minimum fraction of the cohort with nonzero exposure required for a signature to be considered present | `0.1` |
 | `--exposure-thr1` | Minimum patient-wise normalized exposure required for a signature to be considered present | `0.05` |
