@@ -2,11 +2,8 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-
-#get logger instance
 import logging
 _logger = logging.getLogger(__name__)
-
 
 class Resources(object):
 
@@ -19,17 +16,7 @@ class Resources(object):
 
         self.args = args
         self.COSMIC = COSMIC
-        # We Store the tensors as named pandas dataframes internally so we can export them later
-        # Numpy arrays do not natively support row names.
-
-        # format for M
-        # TODO add format description
         self.M = None
-
-        # format for P
-        # since P can be a mixture of fixed and unknown signatures,
-        # we need to account for it by splitting it into these two
-        # components. Hence {'fixed':[None or df], 'inferred':[None or df]}
         self.P = None
         self.A = None
         
@@ -43,8 +30,6 @@ class Resources(object):
         _logger.info(f"P: [{0 if self.P['fixed'] is None else self.P['fixed'].shape[0]} + {0 if self.P['inferred'] is None else self.P['inferred'].shape[0]},  {self.P['fixed'].shape[1] if self.P['fixed'] is not None else self.P['inferred'].shape[1]}]")
         _logger.info(f"A: [{self.A.shape[0]}, {self.A.shape[1]}]")
 
-        # store performance values of interest here.
-        # currently losses, best_losses, epochs, and steps
         self.logs = {}
 
     def initialize_m(self):
@@ -53,7 +38,6 @@ class Resources(object):
 
         _logger.debug("Starting reading M")
 
-        # First, make sure the file specified for M exist on non-volatile memory
         file = os.path.abspath(self.args.matrix)
 
         if not os.path.exists(file):
@@ -62,15 +46,14 @@ class Resources(object):
 
         _logger.debug(f"Parsing file {os.path.basename(file)}.")
 
-        # Next, read in the file
         self.M = {}
 
         if self.args.has_header_and_index:
             m = pd.read_csv(
                 file,
                 sep=self.args.delimiter,
-                header=0,      # First row as column headers
-                index_col=0    # First column as row names
+                header=0, 
+                index_col=0    
             )
             
             if set(list(self.COSMIC.columns)) != set(list(m.columns)):
@@ -96,16 +79,6 @@ class Resources(object):
         _logger.debug(f"Successfully read M with shape [{self.M.shape[0]},{self.M.shape[1]}]")
 
     def initialize_p(self):
-        """Depending on the parameters specified by the user, load P from file(s),
-        and/or initialize random matrix according to NUMPRI
-
-        At the end of this fuction, either both or at least one of the options for
-        Q will be present.
-
-        Args:
-          args: parser arguments
-        """
-
         _logger.debug("Starting initizalize_p")
 
         # we need to enforce that M is read from file first, as the dimension
@@ -154,7 +127,6 @@ class Resources(object):
         else:  # no N
             self.P['inferred'] = None
 
-        # Final report
         p_dim1 = (0 if self.P['fixed'] is None else self.P['fixed'].shape[0]) + (0 if self.P['inferred'] is None else self.P['inferred'].shape[0])
         p_dim2 = self.P['fixed'].shape[1] if self.P['fixed'] is not None else self.P['inferred'].shape[1]
         _logger.debug(f"Final shape for P is [{p_dim1},{p_dim2}]")
@@ -334,7 +306,6 @@ class Resources(object):
         for x in range(len(self.M)):
             self.M = m.copy()
 
-    # define convecience functions for P, W, A, R, Q, and D.
     def get_p(self):
         return self._get_dynamic_tensor(self.P, 'P')
 
