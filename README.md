@@ -1,5 +1,5 @@
 # ReDeNovo
-Hybrid detection of known and novel mutational signatures with ReDeNovo
+Combined inference of known and novel mutational signatures with ReDeNovo
 
 ## Installation
 
