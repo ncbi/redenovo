@@ -154,7 +154,6 @@ def main(args):
                         novel_rows = []
 
                         for ii in range(subdata_p_inferred.shape[0]):
-                            row_values = cosine_sim_df.iloc[ii].drop(cosine_sim_df.columns[ii]) # Exclude self-comparison
                             row_values = row_values[~row_values.index.str.startswith('ReDeNovo')]
                             top_3_columns = row_values.nlargest(3)
                             j = top_3_columns.index[0]
@@ -365,7 +364,6 @@ def main(args):
                                     novel_rows = []
             
                                     for ii in range(subdata_p_inferred.shape[0]):
-                                        row_values = cosine_sim_df.iloc[ii].drop(cosine_sim_df.columns[ii]) # Exclude self-comparison
                                         row_values = row_values[~row_values.index.str.startswith('ReDeNovo')]
                                         top_3_columns = row_values.nlargest(3)
                                         j = top_3_columns.index[0]
