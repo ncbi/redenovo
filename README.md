@@ -7,7 +7,7 @@ Clone the GitHub repository and move into the project directory:
 
 ```bash
 git clone https://github.com/ncbi/ReDeNovo.git
-cd redenovo
+cd ReDeNovo
 
 conda env create -f environment.yml
 conda activate redenovo
