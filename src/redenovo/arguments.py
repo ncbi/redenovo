@@ -3,13 +3,11 @@ import logging
 import os
 import pkg_resources
 import json
-
 from redenovo import __version__
 
 __author__ = "ReDeNovo"
 __copyright__ = "ReDeNovo"
 __license__ = "GPL-3.0-only"
-
 _logger = logging.getLogger(__name__)
 
 
@@ -178,12 +176,10 @@ def parse_args(args):
 
     #primary signatures. either P or N or both are required, but at least one
     p_group = parser.add_argument_group('Primary signature options (at least one option required)')
-    #p_group.add_argument('-P', '--primary', help='File containing the primary signature matrix of size NxK. If omitted, primary signatures will be infered according to -N.')
     p_group.add_argument('-P', '--primary', type=str, nargs='+', default=[], help='List of SBS values, e.g. ["SBS1", "SBS5"]. Default: []')
     p_group.add_argument('-N', '--numpri', type=check_positive_int_or_zero_or_minusone, default=-1, help='Number of novel signatures to infer. If -P is specificed in addition to -N, ReDeNovo will infer N signatures while keeping the ones defined in P as fixed. -1 for ReDenovo to decide it.')
     
     #additional input options
-    #parser.add('-l', '--labels', default=False, action='store_true', help=f"Whether the input contains labels. If set, ReDeNovo will treat the first row/column of each input matrix as labels and use this information when generating the output files.")
     parser.add_argument('-g', '--genome',  type=check_genome, default=38, help='Genome version, either 37 or 38. Default=38.')
     parser.add_argument('-w', '--whole',  type=str, default='WGS', help='Sequencing platform for the data and COSMIC catalogue. "WGS" for Whole Genome Sequencing, "WES" for Whole Exome Sequencing. Default= "WGS"')
     parser.add_argument('--cosmic-version',  type=str, default='3.4', help='COSMIC version ["3.4", "3.3", "3.2", "3.1", "3", "2", or "1"]. Default= "3.4"')
@@ -224,10 +220,8 @@ def parse_args(args):
     parser.add_argument('--optimizer_user_update_steps', type=check_positive_int, help=configargparse.SUPPRESS)
     parser.add_argument('--optimizer_log_update_steps',  type=check_positive_int, help=configargparse.SUPPRESS)
     parser.add_argument('-m', '--misc', type=json.loads, help=configargparse.SUPPRESS)  # dictionary string for misc configs, '{"key":"value"}'
-    #parser.add_argument('-r', '--run', type=check_positive_int, help=configargparse.SUPPRESS) 
     parser.add_argument('-b', '--bootstrap', default=False, help=configargparse.SUPPRESS) 
-    #choices=['red', 'green', 'blue']
-
+    
     args = parser.parse_args(args)
 
     # Additional sanity checks that are out of scope for the configargparse package
