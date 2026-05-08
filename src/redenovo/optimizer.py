@@ -2,8 +2,6 @@ import sys
 from timeit import default_timer as timer
 import numpy as np
 import tensorflow as tf
-
-# get logger instance
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -64,11 +62,10 @@ class Optimizer(object):
 
         _logger.debug("make_p")
 
-        # get the fixed and inferred portion and combine
         p = self.data.get_p()
 
-        p_fixed = p[0]  # this is either None or not
-        if p_fixed is not None:  # Convert to Variable
+        p_fixed = p[0]  
+        if p_fixed is not None:  
             p_fixed = tf.Variable(
                                     initial_value=tf.convert_to_tensor(value=p[0]),
                                     trainable=False,
@@ -78,7 +75,6 @@ class Optimizer(object):
 
         p_inferred = p[1]
         if p_inferred is not None:
-            # constraint: probabilities must sum to one along the mutational signature axis (1)
             clip_min = 1e-10
             clip_max = np.infty
             sum_one_axis = 1
@@ -134,16 +130,13 @@ class Optimizer(object):
         for epoch, stepsize, optimizer in zip(self.args.epochs, self.args.stepsizes, self.args.optimizers):
             _logger.debug(f"{epoch} iterations with step size {stepsize}; optimizer {optimizer}")
 
-        # Perform optimization
         t0=timer()
         for epoch, stepsize, optimizer in zip(self.args.epochs, self.args.stepsizes, self.args.optimizers):
             _logger.debug(f"### New optimization: iterations {epoch} step size {stepsize} optimizer {optimizer}")
-            #tf.print(f"### New optimization: iterations {epoch} step size {stepsize} optimizer {optimizer}")
             self.optimizeModel(self.compute_loss, epoch, stepsize, optimizer)
             _logger.debug(f"Best loss {self.compute_loss()}")
         t1 = timer()
 
-        # Wall seconds elapsed (floating point)
         _logger.debug(f"Optimization complete. Time elapsed: {t1 - t0} seconds")
         return self.compute_loss()
         
@@ -161,9 +154,6 @@ class Optimizer(object):
 
         _logger.debug("Preparing optimization")
 
-        # Convert everything into tensorfow equivalents so we can run it on the GPU
-
-        # print directives
         update_steps = tf.constant(self.args.optimizer_user_update_steps)
         log_update_steps = tf.constant(self.args.optimizer_log_update_steps)
 
@@ -172,16 +162,10 @@ class Optimizer(object):
         num_it = tf.constant(iters)
         cont = tf.Variable(True)
 
-        # current best loss
-        best_loss = tf.Variable(loss()) #best_loss = tf.Variable(tf.cast(loss(), tf.float32))
+        best_loss = tf.Variable(loss())
 
-        # best parameters so far. Since these change depending on the user input,
-        # use an array to store them. They should always correspond to the
-        # content and order of self.trainable_variables
         parameters_best = [tf.Variable(tf.identity(x), shape=x.shape) for x in self.trainable_variables]
 
-        # Define a training operation for tensforflow, this can be exchanged with other optimizers if desired
-        # adadelta,adagrad,adam,adamax,nadam,rmaprop,sgd
         stepsize = float(stepsize)
         if type == "adadelta":
             self.optimizer = tf.optimizers.Adadelta(stepsize)
@@ -202,40 +186,27 @@ class Optimizer(object):
 
         _logger.debug(f"Optimizer is {self.optimizer}")
 
-        # see https://www.tensorflow.org/guide/keras/writing_a_training_loop_from_scratch for more options on custom training loops
         while epoch < num_it and cont:
 
             loss = self.train_step()
 
-            # store the best weights so far, these are the ones we will return
             if loss < best_loss:
                 best_loss.assign(loss)
                 for i, x in enumerate(self.trainable_variables):
                     parameters_best[i].assign(x)
 
-            # update logs?
             if epoch % log_update_steps == 0:
                 self.logs['losses'] = tf.concat([self.logs['losses'], tf.Variable([loss])], axis=0)
                 self.logs['best_losses'] = tf.concat([self.logs['best_losses'], tf.Variable([best_loss])], axis=0)
                 self.logs['epochs'] = tf.concat([self.logs['epochs'], tf.Variable([epoch])], axis=0)
                 self.logs['steps'] = tf.concat([self.logs['steps'], tf.Variable([stepsize])], axis=0)
 
-            # print update?
-            #tf.cond(tf.equal(epoch % update_steps, 0),
-            #        lambda: [   #True
-            #                    tf.print("Epoch", epoch, "loss", loss, "best loss", best_loss, output_stream=sys.stdout)
-            #                ],
-            #        lambda: [   #False
-            #                    tf.no_op()  # just a placeholder
-            #                ])
 
             epoch.assign(epoch + 1)
 
-        # Save best results at the end of the current iteration
         for x, y in zip(parameters_best, self.trainable_variables):
             y.assign(x)
 
-        #tf.print("Optimization bracket completed")
         _logger.debug("Optimization bracket completed")
         
         
