@@ -21,33 +21,25 @@ Sample run:
 ```bash
 redenovo -M src/redenovo/data/M.txt -O src/redenovo/output
 ```
-- specify cosmic version, genome, and WGS/WES
+- specify genome, WGS/WES, and/or cosmic version (if COSMIC is used as catalogue)
 ```bash
 redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -g 38 -w WGS --cosmic-version 3.4
 ```
-- specify manual reference signature database
+- specify manual catalogue signature database (for modified COSMIC, subset of COSMIC, or any other catalogue)
 ```bash
 redenovo -M src/redenovo/data/M.txt -O src/redenovo/output --manual-cosmic --manual-cosmic-file src/redenovo/data/COSMIC.txt
 ```
-- run with a given set of signatures (no novel signature inference)
+- include the inferred/manual signature as catalogue and rerun the tool
 ```bash
-redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -N 0 -P SBS1 SBS2 SBS3 SBS5 SBS8 SBS13 SBS17b SBS18 
+redenovo -M src/redenovo/data/M.txt -O src/redenovo/output --novel-signatures-file src/redenovo/manual_signature.txt --add-novel-signatures
 ```
-- run with a given set of signatures (with given number of novel signature inference, here 2)
+- include the inferred/manual signature and rerun the tool with given set of signatures included
 ```bash
-redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -N 2 -P SBS1 SBS2 SBS3 SBS5 SBS8 SBS13 SBS17b SBS18 
-```
-- include the inferred signature and rerun the tool
-```bash
-redenovo -M src/redenovo/data/M.txt -O src/redenovo/output --novel-signatures-file src/redenovo/output/Cluster_signature_profiles_one_k1.txt --add-novel-signatures
-```
-- include the inferred signature and rerun the tool with given set of signatures included
-```bash
-redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -P SBS1 SBS2 SBS3 SBS5 SBS8 SBS13 SBS17b SBS18  --novel-signatures-file src/redenovo/output/Cluster_signature_profiles_one_k1.txt --add-novel-signatures
+redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -P SBS1 SBS2 SBS3 SBS5 SBS8 SBS13 SBS17b SBS18 --novel-signatures-file src/redenovo/manual_signature.txt --add-novel-signatures
 ```
 - exclude signature/s from the given reference database
 ```bash
-redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -E SBS2  
+redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -E SBS2 SBS40a  
 ```
 - if input mutation count matrix file has row and column names
 ```bash
@@ -55,11 +47,11 @@ redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --has-header
 ```
 - update number of run and iteration (for example: 20 runs and 10 iterations)
 ```bash
-redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --has-header-and-index True -n 20 -i 10
+redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output -n 20 -i 10
 ```
 - be more selective to add a signature waiting for it to be selected repeatedly at least two times
 ```bash
-redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --has-header-and-index True --consno 2
+redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --consno 2
 ```
 
 ## Hyperparameters and Definitions
