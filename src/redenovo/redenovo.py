@@ -30,11 +30,6 @@ def setup_logging(verbosity):
         level=logging.getLevelName(verbosity), stream=sys.stdout, format=logformat, datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-# ---- CLI ----
-# The functions defined in this section are wrappers around the main Python
-# API allowing them to be called directly from the terminal as a CLI
-# executable/script.
-
 def main(args):
     print(f"ReDeNovo version: {__version__}")
     args = arguments.parse_args(args)
