@@ -1,4 +1,3 @@
-import sys
 from timeit import default_timer as timer
 import numpy as np
 import tensorflow as tf
@@ -31,7 +30,7 @@ class Optimizer(object):
         _logger.debug("Finished make p, trying to make A")
         self.A = tf.Variable(initial_value=tf.convert_to_tensor(value=data.get_a()),
                             trainable=True,
-                            constraint=lambda x: tf.clip_by_value(x,0,np.infty),
+                            constraint=lambda x: tf.clip_by_value(x,0,np.inf),
                             name='A')
 
         _logger.debug("Completed tf.Variable initialization")
@@ -62,10 +61,11 @@ class Optimizer(object):
 
         _logger.debug("make_p")
 
+        # get the fixed and inferred portion and combine
         p = self.data.get_p()
 
-        p_fixed = p[0]  
-        if p_fixed is not None:  
+        p_fixed = p[0]  # this is either None or not
+        if p_fixed is not None:  # Convert to Variable
             p_fixed = tf.Variable(
                                     initial_value=tf.convert_to_tensor(value=p[0]),
                                     trainable=False,
@@ -75,8 +75,9 @@ class Optimizer(object):
 
         p_inferred = p[1]
         if p_inferred is not None:
+            # constraint: probabilities must sum to one along the mutational signature axis (1)
             clip_min = 1e-10
-            clip_max = np.infty
+            clip_max = np.inf
             sum_one_axis = 1
             constraint = lambda x: tf.clip_by_value(x, clip_min, clip_max) / tf.reduce_sum(tf.clip_by_value(x, clip_min,clip_max), axis=sum_one_axis, keepdims=True)
             p_inferred = tf.Variable(
@@ -86,38 +87,44 @@ class Optimizer(object):
                                 name='P_inferred')
 
         return [p_fixed, p_inferred]
+        
 
-    @tf.function
     def compute_loss(self):
-        """ Returns an objective funtion corresponding to the chosen settings in args
-        """
-        P = tf.concat(list(filter(lambda x: x is not None, [self.P_fixed, self.P_inferred])), axis=0)
+        """Returns the current loss."""
+    
+        P = tf.concat(
+            list(filter(lambda x: x is not None, [self.P_fixed, self.P_inferred])),
+            axis=0
+        )
+    
         Mhat = tf.matmul(self.A, P)
+    
         loss_value = tf.norm(
-                    tensor=self.M-Mhat,
-                    ord='euclidean',
-                    name='frobenius_norm'
-                    )
+            tensor=self.M - Mhat,
+            ord="euclidean",
+            name="frobenius_norm"
+        )
+    
         return loss_value
 
     
-    @tf.function
+    @tf.function(reduce_retracing=True)
     def train_step(self):
-        """ Wrap loss and gradient computation in a tf.function to speed up computation.
-            This should lead to at least 5 times faster running times as things are now not
-            executed eagerly but compiled into the compute graph.
-        """
-
-        # Compute loss using a GradientTape
+        """One compiled optimizer step."""
+    
         with tf.GradientTape() as tape:
             loss = self.compute_loss()
-
-        # Compute gradients
+    
         gradients = tape.gradient(loss, self.trainable_variables)
-
-        # Apply gradients
-        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-
+    
+        grads_and_vars = [
+            (grad, var)
+            for grad, var in zip(gradients, self.trainable_variables)
+            if grad is not None
+        ]
+    
+        self.optimizer.apply_gradients(grads_and_vars)
+    
         return loss
         
     def optimize(self):
@@ -130,6 +137,7 @@ class Optimizer(object):
         for epoch, stepsize, optimizer in zip(self.args.epochs, self.args.stepsizes, self.args.optimizers):
             _logger.debug(f"{epoch} iterations with step size {stepsize}; optimizer {optimizer}")
 
+        # Perform optimization
         t0=timer()
         for epoch, stepsize, optimizer in zip(self.args.epochs, self.args.stepsizes, self.args.optimizers):
             _logger.debug(f"### New optimization: iterations {epoch} step size {stepsize} optimizer {optimizer}")
@@ -144,28 +152,28 @@ class Optimizer(object):
     def optimizeModel(self, loss, iters, stepsize, type):
         """
         Performs one optimization bracket according to the provided options
-
+    
         Args:
-            loss: identifier of which loss function to use
-            iters: number of iterations (epochs) to perform
+            loss: function that returns the current loss
+            iters: number of iterations/epochs to perform
             stepsize: initial stepsize for the optimizer
-            type: the optimizer type to use
+            type: optimizer type to use
         """
-
         _logger.debug("Preparing optimization")
 
+        # Convert everything into tensorfow equivalents so we can run it on the GPU
         update_steps = tf.constant(self.args.optimizer_user_update_steps)
         log_update_steps = tf.constant(self.args.optimizer_log_update_steps)
 
-        # optimization details
         epoch = tf.Variable(0)
         num_it = tf.constant(iters)
-        cont = tf.Variable(True)
-
+            
         best_loss = tf.Variable(loss())
 
         parameters_best = [tf.Variable(tf.identity(x), shape=x.shape) for x in self.trainable_variables]
 
+        # Define a training operation for tensforflow, this can be exchanged with other optimizers if desired
+        # adadelta,adagrad,adam,adamax,nadam,rmaprop,sgd
         stepsize = float(stepsize)
         if type == "adadelta":
             self.optimizer = tf.optimizers.Adadelta(stepsize)
@@ -177,16 +185,14 @@ class Optimizer(object):
             self.optimizer = tf.optimizers.Adamax(stepsize)
         elif type == "nadam":
             self.optimizer = tf.optimizers.Nadam(stepsize)
-        elif type == "rmaprop":
+        elif type in ["rmsprop", "rmaprop"]:
             self.optimizer = tf.optimizers.RMSprop(stepsize)
         elif type == "sgd":
-            self.optimizer = tf.optimizers.SDG(stepsize)
-        elif type == _:
-            self.optimizer = tf.optimizers.Adam(stepsize)
+            self.optimizer = tf.optimizers.SGD(stepsize)
+        else:
+            raise ValueError(f"Unsupported optimizer: {type}")
 
-        _logger.debug(f"Optimizer is {self.optimizer}")
-
-        while epoch < num_it and cont:
+        while epoch < num_it:
 
             loss = self.train_step()
 
@@ -200,8 +206,7 @@ class Optimizer(object):
                 self.logs['best_losses'] = tf.concat([self.logs['best_losses'], tf.Variable([best_loss])], axis=0)
                 self.logs['epochs'] = tf.concat([self.logs['epochs'], tf.Variable([epoch])], axis=0)
                 self.logs['steps'] = tf.concat([self.logs['steps'], tf.Variable([stepsize])], axis=0)
-
-
+            
             epoch.assign(epoch + 1)
 
         for x, y in zip(parameters_best, self.trainable_variables):
