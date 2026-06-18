@@ -7,7 +7,7 @@ class Exporter(object):
 
     def __init__(self, data):
 
-        _logger.debug("Creating instance of Optimizer")
+        _logger.debug("Creating instance of Exporter")
 
         self.data = data
         self.args = data.args
@@ -17,12 +17,13 @@ class Exporter(object):
 
         os.makedirs(self.outfolder, exist_ok=True)
         _logger.debug(f"Output folder {self.outfolder} is ready.")
-    
+
+
     def write_tables(self):
         """
         Writes the optimized tensors to file
         """
-        _logger.info("Writing matrices to file")
+        _logger.debug("Writing matrices to file")
 
         if self.data.P['fixed'] is not None:
             self.data.P['fixed'].to_csv(os.path.join(self.outfolder, 'P_fixed.txt'),
@@ -46,7 +47,7 @@ class Exporter(object):
         Writes the exposure matrix to file
         """
 
-        _logger.info("Writing matrices to file")
+        _logger.debug("Writing matrices to file")
     
         A_binary = self.data.A.copy()
         A_binary[A_binary < self.args.exposure_thr3] = 0
