@@ -1,15 +1,11 @@
 import configargparse
-import logging
 import os
 import pkg_resources
 import json
-from redenovo import __version__
 
 __author__ = "ReDeNovo"
 __copyright__ = "ReDeNovo"
 __license__ = "GPL-3.0-only"
-_logger = logging.getLogger(__name__)
-
 
 def check_genome(value):
     """Validate integer input in arguments.
@@ -28,27 +24,6 @@ def check_genome(value):
 
     if ivalue < 37 or ivalue > 38:
         raise configargparse.ArgumentTypeError(f"{value} is an invalid int value. Must be 37 or 38")
-
-    return ivalue
-
-
-def check_positive_int_or_zero(value, minval=0):
-    """Validate integer input in arguments.
-
-    Args:
-      value: input value to check
-      minval: value must be equal to or larger than minval
-
-    Returns:
-      True is sanity check passes, raises error otherwise
-    """
-    try:
-        ivalue = int(value)
-    except:
-        raise configargparse.ArgumentTypeError(f"{value} is not an integer")
-
-    if ivalue < minval:
-        raise configargparse.ArgumentTypeError(f"{value} is an invalid int value. Must be >= {minval}")
 
     return ivalue
 
@@ -172,46 +147,46 @@ def parse_args(args):
     parser = configargparse.ArgumentParser(default_config_files=[get_default_config_path()])
 
     #mandatory mutation count matrix
-    parser.add('-M', '--matrix', required=True,  help='Mutation count matrix, specified as mutational profiles.')
-
-    #primary signatures. either P or N or both are required, but at least one
+    parser.add('-M', '--matrix', required=True, type=str, help='Path to mutation count matrix')
     p_group = parser.add_argument_group('Primary signature options (at least one option required)')
-    p_group.add_argument('-P', '--primary', type=str, nargs='+', default=[], help='List of SBS values, e.g. ["SBS1", "SBS5"]. Default: []')
+    p_group.add_argument('-P', '--primary', type=str, nargs='+', default=[], help='List of SBS values, e.g. ["SBS1", "SBS5"]. (default: [])')
     p_group.add_argument('-N', '--numpri', type=check_positive_int_or_zero_or_minusone, default=-1, help='Number of novel signatures to infer. If -P is specificed in addition to -N, ReDeNovo will infer N signatures while keeping the ones defined in P as fixed. -1 for ReDenovo to decide it.')
     
     #additional input options
-    parser.add_argument('-g', '--genome',  type=check_genome, default=38, help='Genome version, either 37 or 38. Default=38.')
-    parser.add_argument('-w', '--whole',  type=str, default='WGS', help='Sequencing platform for the data and COSMIC catalogue. "WGS" for Whole Genome Sequencing, "WES" for Whole Exome Sequencing. Default= "WGS"')
-    parser.add_argument('--cosmic-version',  type=str, default='3.4', help='COSMIC version ["3.4", "3.3", "3.2", "3.1", "3", "2", or "1"]. Default= "3.4"')
-    parser.add_argument('--manual-cosmic', action='store_true', help="Whether use manual COSMIC [user-provided COSMIC.txt in the input folder] (True or False). Default: False")
+    parser.add_argument('-g', '--genome',  type=check_genome, default=38, help='Genome version, either 37 or 38. (default: 38).')
+    parser.add_argument('-w', '--whole', type=check_upper, default='WGS', help='Sequencing platform for the data and COSMIC catalogue. "WGS" for Whole Genome Sequencing, "WES" for Whole Exome Sequencing. (default: "WGS")')
+    parser.add_argument('--cosmic-version', type=str, default='3.4', help='COSMIC version to use when loading the built-in COSMIC catalogue. Supported versions: ["3.4", "3.3", "3.2", "3.1", "3", "2", "1"]. Ignored if --manual-cosmic is used. (default: "3.4").')
+    parser.add_argument('--manual-cosmic', action='store_true', help="Whether use manual COSMIC [user-provided COSMIC.txt in the input folder] (True or False). (default: False)")
     parser.add_argument('--manual-cosmic-file', type=str, default=None, help="Path to the file containing reference signatures. Used only if --manual-cosmic is set.")
     parser.add_argument('--exposure-thr1', default=0.05, type=check_positive_float, help='Minimum patient-wise normalized exposure required for a signature to be considered present (default: 0.05)') 
     parser.add_argument('--exposure-thr2', default=1, type=check_positive_int, help='Minimum raw exposure required for a signature to be considered present (default: 1)')
     parser.add_argument('--exposure-thr3', default=100, type=check_positive_int, help='Minimum raw exposure required for a signature to be considered present for binary exposure matrix (default: 100)')
-    parser.add_argument('--thr1', default=0.1, type=check_positive_float, help='Minimum fraction of patients with exposure ≥ thr1 required for a signature to be considered present (default: 0.1)')
-    parser.add_argument('--thr2', default=0.70, type=check_positive_float, help='Minimum cosine similarity to match a signature with a known COSMIC signature and include in the inferred set (default: 0.70)')
+    parser.add_argument('--thr1', default=0.1, type=check_positive_float, help='Minimum fraction of patients with exposure â‰¥ thr1 required for a signature to be considered present (default: 0.1)')
+    parser.add_argument('--thr2', default=0.75, type=check_positive_float, help='Minimum cosine similarity to match a signature with a known COSMIC signature and include in the inferred set (default: 0.75)')
     parser.add_argument('--thr3', default=0.70, type=check_positive_float, help='Minimum exposure weight for a signature to contribute to the final exposure profile (default: 0.70)') 
-    parser.add_argument('--thr4', default=0.80, type=check_positive_float, help='Minimum cosine similarity to consider a signature as known and exclude it from novel candidate detection (default: 0.80)') 
+    parser.add_argument('--thr4', default=0.75, type=check_positive_float, help='Minimum cosine similarity required to connect two novel signature profiles during single-linkage clustering in the denovo discovery phase (default: 0.75)')
     parser.add_argument('--thr5', default=0.1, type=check_positive_float, help='Minimum fraction of the cohort with nonzero exposure required for a signature to be considered present (default: 0.1)')
-    parser.add_argument('-n', '--numruns', default=10, type=check_positive_int, help='Number of runs to repeat. Default=10') 
+    parser.add_argument('--thr6', default=3, type=check_positive_int, help='Number of times a signature can fail the support criteria within a run before being permanently banned for that run (default: 3)')
+    parser.add_argument('--thr7', default=0.75, type=check_positive_float, help='Minimum cosine similarity to consider a signature as known and exclude it from novel candidate detection (default: 0.75)')
+    parser.add_argument("--numworkers", type=int, default=1, help="Number of worker processes to use. If not provided or less than 1, uses min(numruns, available CPUs). Values greater than available CPUs are capped at the available CPU count. The final number of workers is always capped by numruns.")
+    parser.add_argument('-n', '--numruns', default=10, type=check_positive_int, help='Number of runs to repeat. (default: 10)') 
     parser.add_argument('-i', '--numiters', default=10, type=check_positive_int, help='Maximum number of iterations allowed while attempting to add new fixed signature (default: 10)') 
     parser.add_argument('--consno', default=1, type=check_positive_int, help='Minimum number of times a signature must be selected to be included in the inferred signature set (default: 1)') 
-    p_group.add_argument('-E', '--exclude', type=str, nargs='+', default=[], help='List of SBS values to exclude from COSMIC, e.g. ["SBS1", "SBS5"]. Default: []')
+    p_group.add_argument('-E', '--exclude', type=str, nargs='+', default=[], help='List of SBS values to exclude from COSMIC, e.g. ["SBS1", "SBS5"]. (default: [])')
     parser.add('-d', '--delimiter', default='\t', help="The delimiter used to separate the column in the input matrices. Default is tabulator. This delimiter will also be used for the output files.")
 
     #output options
-    parser.add_argument('-O', '--out', required=False, default=os.getcwd(), help='Path to output folder. Folder will be created if it does not not exist. If omitted, the current folder will be used as the output directory. Existing files will be overwritten.')
+    parser.add_argument('-O', '--out', required=False, default=os.getcwd(), help='Path to output folder. Folder will be created if it does not not exist. Existing files will be overwritten. (default: the current folder)')
     parser.add_argument('-v', '--verbosity', type=check_upper, default='INFO', choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], help='Set the verbosity level defining the detail of ReDeNovo messages to stdout.')
-    parser.add_argument('--has-header-and-index', type=bool, default=False, help="Whether the file has row names and column headers (True or False)")
-    parser.add_argument('--add-novel-signatures', action='store_true', help="Whether evaluate with novel signatures in the file provided (True or False). Used only if -N is set as 0. Default: False")
-    parser.add_argument('--check-novel', action='store_true', help="Whether check the novel signature or not (True or False). Default: False")
+    parser.add_argument('--has-header-and-index', action='store_true', help="Whether the file has row names and column headers (True or False). (default: False)")
+    parser.add_argument('--add-novel-signatures', action='store_true', help="Whether to add user-provided novel signatures to the reference catalogue before inference. (default: False)")
     parser.add_argument('--novel-signatures-file', type=str, default=None, help="Path to the file containing novel signatures. Used only if --add-novel-signatures is set.")
 
     # optimizer options
     q_group = parser.add_argument_group('Optimizer options (all or none are required)')
     q_group.add_argument('-e', '--epochs', nargs='+', type=check_positive_int, help='List of integers specifying the number of epochs in each optimization bracket. List must be of same size as -s and -o')
     q_group.add_argument('-s', '--stepsizes', nargs='+', type=check_positive_float, help=f"List of integers specifying the stepsize for the corresponding bracket defined with -e. List must be of same size as -e and -o")
-    q_group.add_argument('-o', '--optimizers', nargs='+', type=check_lower, choices=["adadelta", "adagrad", "adam", "adamax", "nadam", "rmaprop", "sgd"], help=f"List of optimizers to use in each bracket defined with -e. List must be of same size as -e and -s")
+    q_group.add_argument('-o', '--optimizers', nargs='+', type=check_lower, choices=["adadelta", "adagrad", "adam", "adamax", "nadam", "rmaprop", "rmsprop", "sgd"], help=f"List of optimizers to use in each bracket defined with -e. List must be of same size as -e and -s")
 
     # config file
     parser.add('-c', '--config', required=False, is_config_file=True, help='Config file path')
@@ -220,15 +195,10 @@ def parse_args(args):
     parser.add_argument('--optimizer_user_update_steps', type=check_positive_int, help=configargparse.SUPPRESS)
     parser.add_argument('--optimizer_log_update_steps',  type=check_positive_int, help=configargparse.SUPPRESS)
     parser.add_argument('-m', '--misc', type=json.loads, help=configargparse.SUPPRESS)  # dictionary string for misc configs, '{"key":"value"}'
-    parser.add_argument('-b', '--bootstrap', default=False, help=configargparse.SUPPRESS) 
-    
+
     args = parser.parse_args(args)
 
-    # Additional sanity checks that are out of scope for the configargparse package
-    # at least one primary signature option -P or -N
-    if args.primary is None and args.numpri is None:
-       parser.error("At least one primary signature option is required. Either use -P or -N, or both.")
-
+    # Additional sanity checks
     # N must be greater or equal to 1
     if args.numpri is not None and args.numpri < -1:
         parser.error("The number of primary signatures (-N) must be >= -1.")
@@ -246,4 +216,29 @@ def parse_args(args):
     if sum(x is not None for x in opt_group) == 3 and len(set(map(len, opt_group))) != 1:
         parser.error(f"The optimizer parameters must specify the same number of brackets. Currently the number of brackets for each option is as follows: epochs:{len(args.epochs)}, stepsizes:{len(args.stepsizes)}, optimizers:{len(args.optimizers)}")
 
+    if not args.manual_cosmic and args.whole not in ['WGS', 'WES']:
+        parser.error("--whole must be either 'WGS' or 'WES' unless --manual-cosmic is used.")
+
+    valid_cosmic_versions = ['3.4', '3.3', '3.2', '3.1', '3', '2', '1']
+    if not args.manual_cosmic and args.cosmic_version not in valid_cosmic_versions:
+        parser.error(f"--cosmic-version must be one of {valid_cosmic_versions} unless --manual-cosmic is used.")
+    
+    if args.manual_cosmic and args.manual_cosmic_file is None:
+        parser.error("--manual-cosmic-file is required when --manual-cosmic is set.")
+    
+    if args.add_novel_signatures and args.novel_signatures_file is None:
+        parser.error("--novel-signatures-file is required when --add-novel-signatures is set.")
+    
+    for path_arg in [args.matrix, args.manual_cosmic_file, args.novel_signatures_file]:
+        if path_arg is not None and (not os.path.exists(path_arg) or os.path.isdir(path_arg)):
+            parser.error(f"File not found or invalid file path: {path_arg}")
+
+    for name in ['exposure_thr1', 'thr1', 'thr2', 'thr3', 'thr4', 'thr5']:
+        value = getattr(args, name)
+        if value > 1:
+            parser.error(f"--{name.replace('_', '-')} must be <= 1.")
+
+    if args.consno > args.numiters:
+        parser.error("--consno cannot be greater than --numiters.")
+    
     return args
