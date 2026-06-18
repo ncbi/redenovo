@@ -45,7 +45,7 @@ redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -N 2 -P SBS1 SBS2 SBS
 ```bash
 redenovo -M src/redenovo/data/M.txt -O src/redenovo/output --novel-signatures-file src/redenovo/manual_signature.txt --add-novel-signatures
 ```
-- include a manual signature and rerun the tool with given set of signatures included (does not guarantee that given set will be kept, just force it to begin)
+- include a manual signature and rerun the tool with given set of signatures included (does not guarantee that given set will be kept, just force it at the beginning)
 ```bash
 redenovo -M src/redenovo/data/M.txt -O src/redenovo/output -P SBS1 SBS2 SBS3 SBS5 SBS8 --novel-signatures-file src/redenovo/manual_signature.txt --add-novel-signatures
 ```
