@@ -5,6 +5,7 @@ import numpy as np
 import logging
 _logger = logging.getLogger(__name__)
 
+
 class Resources(object):
 
     def __init__(self, args, COSMIC):
@@ -16,6 +17,7 @@ class Resources(object):
 
         self.args = args
         self.COSMIC = COSMIC
+        # We Store the tensors as named pandas dataframes internally so we can export them later
         self.M = None
         self.P = None
         self.A = None
@@ -26,9 +28,9 @@ class Resources(object):
         self.initialize_a()
         _logger.debug("Tensor initialization complete.")
         _logger.debug("Final tensor shapes are [dimensions with a \"+\" refer to the fixed (left) and the to be inferred component (right)]:")
-        _logger.info(f"M: [{self.M.shape[0]}, {self.M.shape[1]}]")
-        _logger.info(f"P: [{0 if self.P['fixed'] is None else self.P['fixed'].shape[0]} + {0 if self.P['inferred'] is None else self.P['inferred'].shape[0]},  {self.P['fixed'].shape[1] if self.P['fixed'] is not None else self.P['inferred'].shape[1]}]")
-        _logger.info(f"A: [{self.A.shape[0]}, {self.A.shape[1]}]")
+        _logger.debug(f"M: [{self.M.shape[0]}, {self.M.shape[1]}]")
+        _logger.debug(f"P: [{0 if self.P['fixed'] is None else self.P['fixed'].shape[0]} + {0 if self.P['inferred'] is None else self.P['inferred'].shape[0]},  {self.P['fixed'].shape[1] if self.P['fixed'] is not None else self.P['inferred'].shape[1]}]")
+        _logger.debug(f"A: [{self.A.shape[0]}, {self.A.shape[1]}]")
 
         self.logs = {}
 
@@ -38,6 +40,7 @@ class Resources(object):
 
         _logger.debug("Starting reading M")
 
+        # First, make sure the file specified for M exist on non-volatile memory
         file = os.path.abspath(self.args.matrix)
 
         if not os.path.exists(file):
@@ -46,14 +49,12 @@ class Resources(object):
 
         _logger.debug(f"Parsing file {os.path.basename(file)}.")
 
-        self.M = {}
-
         if self.args.has_header_and_index:
             m = pd.read_csv(
                 file,
                 sep=self.args.delimiter,
-                header=0, 
-                index_col=0    
+                header=0,      # First row as column headers
+                index_col=0    # First column as row names
             )
             
             if set(list(self.COSMIC.columns)) != set(list(m.columns)):
@@ -66,23 +67,33 @@ class Resources(object):
                             sep=self.args.delimiter,
                             header=None,
                             index_col=False)
+            if m.shape[1] != len(self.COSMIC.columns):
+                raise ValueError(
+                    f"Column mismatch between COSMIC and input matrix M. "
+                    f"COSMIC has {len(self.COSMIC.columns)} mutation categories, "
+                    f"but input matrix has {m.shape[1]} columns."
+                )
             m.columns = self.COSMIC.columns
             m.index = [f"genome_{x+1}" for x in range(m.shape[0])]
 
-        # Cast to float
         m = m.astype(np.float64, copy=False, errors='raise')
-
-        if self.args.bootstrap:
-            m = m.sample(frac=0.8)#, random_state=1)
 
         self.M = m
         _logger.debug(f"Successfully read M with shape [{self.M.shape[0]},{self.M.shape[1]}]")
 
     def initialize_p(self):
+        """Depending on the parameters specified by the user, load P from file(s),
+        and/or initialize random matrix according to NUMPRI
+
+        At the end of this fuction, either both or at least one of the options for
+        Q will be present.
+
+        Args:
+          args: parser arguments
+        """
+
         _logger.debug("Starting initizalize_p")
 
-        # we need to enforce that M is read from file first, as the dimension
-        # compatibility depends on it
         if self.M is None:
             _logger.debug("initialize_m has not been called yet. Make sure you call this function first.")
             _logger.critical("Internal error (no M). Exiting.")
@@ -90,15 +101,19 @@ class Resources(object):
 
         self.P = {}  # initialize
 
-        if self.args.primary is not None:
+        if self.args.primary: 
+            missing_primary = [sig for sig in self.args.primary if sig not in self.COSMIC.index]
+            if missing_primary:
+                raise ValueError(f"Primary signature(s) not found in COSMIC: {missing_primary}")
             p = self.COSMIC.loc[self.args.primary]
             # cast to float
             p = p.astype(np.float64, copy=False, errors='raise')
             # Sanity check: the number of mutational categories must be identical to the one in M
             if self.M.shape[1] != p.shape[1]:
-                _logger.critical(f"The number of mutational signatures of M and P must be identical. Currently, M has {self.M[0][1].shape[0]}, and P has {p.shape[1]} signatures. Exiting.")
-                sys.exit(1)
-
+                raise ValueError(
+                    f"The number of mutation categories in M and P must be identical. "
+                    f"M has {self.M.shape[1]} columns, and P has {p.shape[1]} columns."
+                )
             # add to dictionary
             self.P['fixed'] = p
             _logger.debug(f"Successfully read P with shape [{p.shape[0]},{p.shape[1]}]")
@@ -107,11 +122,11 @@ class Resources(object):
             self.P['fixed'] = None
 
         # next, check if we have primary signatures to infer
-        if self.args.numpri is not None:
+        if self.args.numpri is not None and self.args.numpri > 0:
             _logger.debug("Case N is not None")
 
             # initialize with random data
-            p = pd.DataFrame(np.random.rand(self.args.numpri, self.M.shape[1]), # since the dimension of p in this case depends on knowing the number of categories, we source it from M
+            p = pd.DataFrame(np.random.rand(self.args.numpri, self.M.shape[1]), 
                                 columns=self.M.columns,
                                 index=[f"ReDeNovo_p{x+1}" for x in range(self.args.numpri)]
                             )
@@ -127,9 +142,17 @@ class Resources(object):
         else:  # no N
             self.P['inferred'] = None
 
-        p_dim1 = (0 if self.P['fixed'] is None else self.P['fixed'].shape[0]) + (0 if self.P['inferred'] is None else self.P['inferred'].shape[0])
+        num_fixed = 0 if self.P['fixed'] is None else self.P['fixed'].shape[0]
+        num_inferred = 0 if self.P['inferred'] is None else self.P['inferred'].shape[0]
+        if num_fixed + num_inferred == 0:
+            raise ValueError(
+                "No signatures available for optimization. "
+                "Provide at least one primary signature or set --numpri > 0."
+            )
+        p_dim1 = num_fixed + num_inferred
         p_dim2 = self.P['fixed'].shape[1] if self.P['fixed'] is not None else self.P['inferred'].shape[1]
         _logger.debug(f"Final shape for P is [{p_dim1},{p_dim2}]")
+        
 
     def initialize_a(self):
         """Initializes A
@@ -148,7 +171,7 @@ class Resources(object):
         pri_sigs_index = ([] if self.P['fixed'] is None else list(self.P['fixed'].index)) + ([] if self.P['inferred'] is None else list(self.P['inferred'].index))
 
         # initialize with random data
-        a = pd.DataFrame(   np.random.rand(len(self.M), num_pri_sigs), # since the dimension of p in this case depends on knowing the number of categories, we source it from M
+        a = pd.DataFrame(   np.random.rand(len(self.M), num_pri_sigs), 
                             columns=pri_sigs_index,
                             index=self.M.index)
 
@@ -302,21 +325,13 @@ class Resources(object):
             _logger.debug(f"Passed shape is {list(m.shape)} whereas stored shape is [list({self.M.shape})]. Exiting.")
             sys.exit(1)
 
-        # Set values
-        for x in range(len(self.M)):
-            self.M = m.copy()
+        self.M.iloc[:, :] = np.array(m, copy=True)
 
     def get_p(self):
         return self._get_dynamic_tensor(self.P, 'P')
 
     def set_p(self, p):
         return self._set_dynamic_tensor(self.P, p, 'P')
-
-    def set_p_fixed(self, p_fixed):
-        p_cur = self.get_p()
-        p_cur['fixed'] = p_fixed
-        self.set_p(p_cur)
-        return self._set_dynamic_tensor(self.P, p_cur, 'P with new fixed')
 
     def get_a(self):
         return self._get_tensor(self.A, 'A')
