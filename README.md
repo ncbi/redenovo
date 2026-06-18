@@ -72,7 +72,7 @@ redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --consno 2
 
 | Parameter | Description | Default |
 |---------|-------------|---------|
-| `--consno` | Minimum number of times a signature must be selected to be included in the inferred signature set | `1` |
+| `--consno` | Minimum number of times a catalogue signature must be selected to be included in the inferred signature set | `1` |
 | `-i`, `--numiters` | Maximum number of iterations allowed while attempting to add a new fixed signature (patience for novel signature detection) | `10` |
 | `-n`, `--numruns` | Number of runs to repeat the analysis | `10` |
 | `--thr1` | Minimum fraction of patients with exposure ≥ `thr1` required for a signature to be considered present | `0.1` |
