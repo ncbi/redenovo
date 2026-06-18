@@ -61,7 +61,7 @@ redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --has-header
 ```bash
 redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output -n 20 -i 10
 ```
-- be more selective to add a signature waiting for it to be selected repeatedly at least two times
+- be more selective to add a catalogue signature (For example, here, it is waiting for the catalogue signature to be selected if inferred at least two times)
 ```bash
 redenovo -M src/redenovo/data/redenovo_M.txt -O src/redenovo/output --consno 2
 ```
